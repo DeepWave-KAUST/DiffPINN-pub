@@ -29,7 +29,6 @@ DiffPINN-pub/
 ├── logo/                      # Repository logo
 ├── environment.yml            # Conda environment file
 ├── install_env.sh             # Installation script
-├── pyproject.toml
 └── README.md
 ```
 
