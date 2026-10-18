@@ -46,7 +46,7 @@ Main folders:
 
 The datasets and pretrained models are too large for GitHub and are provided through Zenodo:
 
-**Zenodo DOI:** [to be added]
+**Zenodo DOI:** https://doi.org/10.5281/zenodo.23449722
 
 Three archives are available. Extract each one into the matching empty folder of this repository.
 
@@ -220,7 +220,7 @@ conda activate diffpinn
 
 3. Download the three archives from Zenodo:
 
-[to be added]
+https://doi.org/10.5281/zenodo.23449722
 
 4. Extract each archive into its matching folder, so that `dataset/pinntest/`, `trained_model/` and `generated_weight/` are populated.
 
