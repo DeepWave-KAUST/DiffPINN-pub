@@ -3,11 +3,11 @@ requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "project-name-here"
+name = "Accelerating seismic wavefield representation via latent diffusion-initialized physics-informed neural networks"
 authors = [
-    {name = "Full Name", email = "first.lastname@kaust.edu.sa"},
+    {name = "Shijun Cheng", email = "shijun.cheng@kaust.edu.sa"},
 ]
-description = "Short description here"
+description = "Accelerating seismic wavefield representation via latent diffusion-initialized physics-informed neural networks"
 readme = "README.md"
 requires-python = ">=3.8"
 keywords = ["inverse problems", "seismic"]

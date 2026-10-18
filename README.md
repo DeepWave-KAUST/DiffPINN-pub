@@ -1,42 +1,247 @@
-![LOGO](https://github.com/DeepWave-Kaust/Project-Template/blob/main/asset/logo.png)
+![LOGO](https://github.com/DeepWave-KAUST/DiffPINN-pub/blob/main/logo/logo.png)
+<div align="center">
 
-Reproducible material for **XXX - Author M., Author M., Author C.**
+<h3><strong>DiffPINN: Generative diffusion-initialized physics-informed neural networks for accelerating seismic wavefield representation</strong></h3>
 
-[Click here](https://kaust.sharepoint.com/:f:/r/sites/M365_Deepwave_Documents/Shared%20Documents/Restricted%20Area/DWxxxxxxxx) to access the Project Report. Authentication to the _Restricted Area_ filespace is required.
+</div>
 
-# Project structure
-This repository is organized as follows:
+## Overview
 
-* :open_file_folder: **package**: python library containing routines for ....;
-* :open_file_folder: **asset**: folder containing logo;
-* :open_file_folder: **data**: folder containing data (or instructions on how to retrieve the data
-* :open_file_folder: **notebooks**: set of jupyter notebooks reproducing the experiments in the paper (see below for more details);
-* :open_file_folder: **scripts**: set of python scripts used to run multiple experiments ...
+This repository provides the official implementation of DiffPINN, a latent diffusion framework that generates initialization parameters for physics-informed neural networks (PINNs) used in frequency-domain seismic wavefield modeling.
 
-## Notebooks
-The following notebooks are provided:
+PINNs must usually be retrained from scratch for every new velocity model, which is expensive when many wavefield simulations are required. DiffPINN addresses this by learning the distribution of converged PINN parameters. A set of PINNs is first trained across diverse velocity models and their parameters are flattened into one-dimensional vectors. An autoencoder compresses the length of these vectors into multi-channel latent tensors, and a conditional diffusion model is trained on the latent tensors with the velocity model and source configuration as conditions. At inference, the diffusion model generates a latent tensor for a new velocity model, with a physics-based gradient correction applied at each reverse step, and the decoder turns it into a complete set of PINN parameters. Starting from these parameters, PINN training converges substantially faster while reaching higher final accuracy.
 
-- :orange_book: ``X1.ipynb``: notebook performing ...;
-- :orange_book: ``X2.ipynb``: notebook performing ...
+---
 
+## Project structure
+
+```text
+DiffPINN-pub/
+├── diffpinn/                  # Python library for all five stages
+│   ├── meta_training/         # Meta-learning initialization (Meta-PINN)
+│   ├── pinn_training/         # Training the 2600 PINNs that form the parameter dataset
+│   ├── autoencoder_training/  # Autoencoder over the flattened PINN parameters
+│   ├── diffusion_training/    # Conditional latent diffusion training and sampling
+│   └── pinn_testing/          # Test comparisons: DiffPINN, Meta-PINN, vanilla PINN
+├── dataset/                   # Empty; place the extracted dataset.zip here
+├── trained_model/             # Empty; place the extracted trained_model.zip here
+├── generated_weight/          # Empty; place the extracted generated_weight.zip here
+├── logo/                      # Repository logo
+├── environment.yml            # Conda environment file
+├── install_env.sh             # Installation script
+├── pyproject.toml
+└── README.md
+```
+
+Main folders:
+
+* :open_file_folder: **diffpinn**: Python library containing the code for all stages of the framework.
+* :open_file_folder: **dataset**: destination for the datasets downloaded from Zenodo.
+* :open_file_folder: **trained_model**: destination for the pretrained checkpoints downloaded from Zenodo.
+* :open_file_folder: **generated_weight**: destination for the generated PINN parameters downloaded from Zenodo.
+* :open_file_folder: **logo**: Logo image used in this repository.
+
+---
+
+## Supplementary files
+
+The datasets and pretrained models are too large for GitHub and are provided through Zenodo:
+
+**Zenodo DOI:** [to be added]
+
+Three archives are available. Extract each one into the matching empty folder of this repository.
+
+### `dataset.zip` → `dataset/`
+
+Contains five folders, one per stage:
+
+```text
+metatrain/     # meta_train.mat, used for meta-training
+pinntrain/     # pinntrain1.mat ... pinntrain2600.mat, one per velocity model
+aetrain/       # flattened parameters of the 2600 converged PINNs
+difftrain/     # latent tensors encoded from the flattened parameters
+pinntest/      # CurveVelA.mat, Layer.mat, FlatFaultA.mat
+```
+
+Each `.mat` file holds the collocation samples (`x_train`, `z_train`, `sx_train`), the squared slowness of the medium and of the background (`m_train`, `m0_train`), the analytical background wavefield (`u0_real_train`, `u0_imag_train`), and a numerical reference solution on the full grid (`x_test`, `z_test`, `sx_test`, `du_real_test`, `du_imag_test`). The velocity models are taken from the CurveVel-A class of OpenFWI, resized to 101×101 with a grid spacing of 25 m, and all wavefields are computed at 5 Hz. The reference solutions are obtained with the optimized nine-point frequency-domain finite-difference scheme of Jo et al. (1996).
+
+The three test models in `pinntest/` are CurveVelA (in-distribution), Layer (a layered section of the Marmousi model) and FlatFaultA (both out-of-distribution).
+
+Because `aetrain/` and `difftrain/` are the outputs of the two preceding stages, providing them lets you start at any point in the pipeline rather than rebuilding the parameter dataset from scratch.
+
+### `trained_model.zip` → `trained_model/`
+
+```text
+meta_trained.pth    # meta-learned PINN initialization
+ae_trained.pth      # trained autoencoder
+diff_trained.pt     # trained conditional diffusion model
+```
+
+### `generated_weight.zip` → `generated_weight/`
+
+```text
+CurveVelA_weight.mat
+Layer_weight.mat
+FlatFaultA_weight.mat
+```
+
+These are the latent tensors generated by the trained diffusion model for the three test velocity models, using 10 DDIM steps with physics guidance at γ = 0.01. With these files you can run the test comparisons directly without retraining or resampling.
+
+---
 
 ## Getting started :space_invader: :robot:
-To ensure reproducibility of the results, we suggest using the `environment.yml` file when creating an environment.
 
-Simply run:
-```
+Create the Conda environment with the provided file:
+
+```bash
 ./install_env.sh
 ```
-It will take some time, if at the end you see the word `Done!` on your terminal you are ready to go. 
 
-Remember to always activate the environment by typing:
+The installation may take some time. If you see the word `Done!` in your terminal at the end of the installation, the environment has been successfully created.
+
+Activate it before running any script:
+
+```bash
+conda activate diffpinn
 ```
-conda activate my_env
+
+---
+
+## Running the code :page_facing_up:
+
+The five stages below are listed in the order in which they are executed. Each stage reads the output of the previous one, so you may start from any stage for which the required inputs are available from Zenodo. All scripts are run from inside their own folder.
+
+### 1. Meta-training
+
+Trains the meta-learned initialization used to make the training of 2600 PINNs affordable. Reads `dataset/metatrain/`, writes checkpoints to `meta_training/checkpoints/`.
+
+```bash
+cd diffpinn/meta_training
+python metatrain.py
 ```
 
-**Disclaimer:** All experiments have been carried on a Intel(R) Xeon(R) CPU @ 2.10GHz equipped with a single NVIDIA GEForce RTX 3090 GPU. Different environment 
-configurations may be required for different combinations of workstation and GPU.
+Key arguments: `--epoch 40000`, `--meta_lr 1.5e-3`, `--update_lr 2e-3`, `--ntask 10`, `--omega 5`.
 
-## Cite us 
-DWXXX - Author1 et al. (2022) Report title.
+The checkpoint used in the paper is provided as `trained_model/meta_trained.pth`, so this stage can be skipped.
 
+### 2. PINN training
+
+Trains one PINN per velocity model, starting from the meta-learned initialization, to build the parameter dataset. Reads `dataset/pinntrain/` and `trained_model/meta_trained.pth`, writes one checkpoint per model to `pinn_training/checkpoints/`.
+
+```bash
+cd diffpinn/pinn_training
+python pinntrain.py
+```
+
+Key arguments: `--epoch 15000`, `--data_num 2600`, `--lr 1.5e-3`, `--omega 5`, `--use_meta True`.
+
+This is by far the most expensive stage, roughly 65 hours on ten V100 GPUs. The resulting parameter vectors are provided as `dataset/aetrain/`, so this stage can be skipped.
+
+### 3. Autoencoder training
+
+Trains the autoencoder that compresses the length of the flattened parameter vectors into 128×1590 latent tensors. Reads `dataset/aetrain/`, writes checkpoints to `autoencoder_training/checkpoints/`.
+
+```bash
+cd diffpinn/autoencoder_training
+python ae_train.py
+```
+
+Key arguments: `--epoch 1000`, `--batch_size 30`, `--lr 1e-3`, `--latent_dim 203520`.
+
+Takes about 15.6 hours on a single A100. The trained model is provided as `trained_model/ae_trained.pth`.
+
+### 4. Diffusion training
+
+Trains the conditional diffusion model over the latent tensors. Reads `dataset/difftrain/` and `trained_model/ae_trained.pth`.
+
+```bash
+cd diffpinn/diffusion_training
+python train.py
+```
+
+Key arguments: `--lr 5e-5`, `--batch_size 20`, `--ema_rate 0.999`. The model is trained for 400000 iterations, about 23.5 hours on a single A100. The trained model is provided as `trained_model/diff_trained.pt`.
+
+### 5. Generating PINN parameters
+
+Samples latent tensors for the three test velocity models and saves them. Reads `dataset/pinntest/`, `trained_model/diff_trained.pt` and `trained_model/ae_trained.pth`.
+
+```bash
+cd diffpinn/diffusion_training
+python sample.py --use_ddim True --timestep_respacing ddim10 --pde_guide True --scale_factor 0.01
+```
+
+Here `timestep_respacing=ddim10` selects 10 steps from the original 1000-step diffusion process, `pde_guide` enables the physics-based gradient correction at each reverse step, and `scale_factor` is the step size γ of that correction. These are the settings used throughout the paper.
+
+The results are written to `diffusion_training/output/ddim10/usepde_True_scale0.01/{name}_out.mat`. To use them in the next stage, copy each file into `generated_weight/` and rename it to `{name}_weight.mat`, for example:
+
+```bash
+cp output/ddim10/usepde_True_scale0.01/CurveVelA_out.mat ../../generated_weight/CurveVelA_weight.mat
+```
+
+Alternatively, use the files provided in `generated_weight.zip`.
+
+### 6. Test comparisons
+
+Trains a PINN for each of the three test velocity models from each of the three initializations, and records the PDE loss and the accuracy against the reference solution at every epoch.
+
+```bash
+cd diffpinn/pinn_testing
+python train_diffpinn.py      # initialized from the generated parameters
+python train_metapinn.py      # initialized from the meta-learned model
+python train_vanillapinn.py   # random initialization
+```
+
+Each script loops over CurveVelA, FlatFaultA and Layer, so no argument is needed to select a model. Key arguments: `--epoch 10000`, `--lr 1.5e-3`, `--omega 5`. The learning rate is decayed by 0.6 at epochs 2000, 4000, 6000 and 8000.
+
+Predictions are saved every 100 epochs to `pinn_testing/output/{method}/{name}/pred{epoch}.mat`, and `train_diffpinn.py` additionally saves `pred_fromini.mat`, the wavefield predicted directly from the generated parameters before any training (Figure 10 of the paper). Checkpoints are written every 500 epochs to `pinn_testing/checkpoints/{method}/{name}/`. Training curves can be followed with TensorBoard:
+
+```bash
+tensorboard --logdir runs
+```
+
+---
+
+## Reproducibility workflow
+
+The quickest route to the results in the paper, using the provided checkpoints and generated parameters:
+
+1. Clone this repository:
+
+```bash
+git clone https://github.com/DeepWave-KAUST/DiffPINN-pub/
+cd DiffPINN-pub
+```
+
+2. Create and activate the Conda environment:
+
+```bash
+./install_env.sh
+conda activate diffpinn
+```
+
+3. Download the three archives from Zenodo:
+
+[to be added]
+
+4. Extract each archive into its matching folder, so that `dataset/pinntest/`, `trained_model/` and `generated_weight/` are populated.
+
+5. Run the three test scripts:
+
+```bash
+cd diffpinn/pinn_testing
+python train_diffpinn.py
+python train_metapinn.py
+python train_vanillapinn.py
+```
+
+To reproduce the full pipeline instead, run stages 1 to 5 in order before step 5 above. Note that stage 2 alone takes roughly 65 hours on ten V100 GPUs.
+
+---
+
+## Hardware and environment
+
+The 2600 PINNs were trained on ten NVIDIA V100 GPUs (32 GB each). The autoencoder and the diffusion model were trained on a single NVIDIA A100 GPU (80 GB). The reported memory usage is 4.55 GB for a single PINN, 48.12 GB for the autoencoder at a batch size of 30, and 21.20 GB for the diffusion model at a batch size of 20.
+
+If your GPU memory is insufficient, reduce `--batch_size` in `ae_train.py` or `train.py`. The autoencoder is the more demanding of the two, since its outermost layers operate on the full-length parameter vector.
+
+---
